@@ -1,46 +1,62 @@
 #!/usr/bin/python3
-""" Module"""
-import requests
-
-
-def count_words(subreddit, word_list, word_count=[], after=None):
 """Module"""
 
-    word_list = [word.lower() for word in word_list]
+from audioop import reverse
+import requests
 
-    if bool(word_count) is False:
-        for word in word_list:
-            word_count.append(0)
+headers = {'User-Agent': 'MyAPI/0.0.1'}
 
-    url = 'https://www.reddit.com/r/{}/hot.json?after={}'.format(subreddit,
-                                                                 after)
-    headers = requests.utils.default_headers()
-    headers.update({'User-Agent': 'My User Agent 1.0'})
 
-    res = requests.get(url, headers=headers, allow_redirects=False)
-    if res.status_code == 200:
-        req = res.json()
-        for child in req['data']['children']:
-            i = 0
-            for i in range(len(word_list)):
-                for name in [word for word in child['data']['title'].split()]:
-                    name = name.lower()
-                    if word_list[i] == name:
-                        word_count[i] += 1
-                i += 1
-        if req['data']['after'] is not None:
-            count_words(subreddit, word_list,
-                        word_count, req['data']['after'])
+def count_words(subreddit, word_list, after="", hot_list=[]):
+    """print the count of word_list."""
 
+    subreddit_url = "https://reddit.com/r/{}/hot.json".format(subreddit)
+
+    parameters = {'limit': 100, 'after': after}
+    response = requests.get(subreddit_url, headers=headers, params=parameters)
+
+    if response.status_code == 200:
+
+        json_data = response.json()
+        if (json_data.get('data').get('dist') == 0):
+            return
+
+        for child in json_data.get('data').get('children'):
+            title = child.get('data').get('title')
+            hot_list.append(title)
+
+        after = json_data.get('data').get('after')
+        if after is not None:
+
+            return count_words(subreddit, word_list,
+                               after=after, hot_list=hot_list)
         else:
-            nary = {}
-            for key_word in list(set(word_list)):
-                i = word_list.index(key_word)
+            counter = {}
+            for word in word_list:
+                word = word.lower()
+                if word not in counter.keys():
+                    counter[word] = 0
+                else:
+                    counter[word] += 1
 
-                if word_count[i] != 0:
-                    nary[word_list[i]] = (word_count[i] *
-                                          word_list.count(word_list[i]))
+            for title in hot_list:
+                title_list = title.lower().split(' ')
+                for word in counter.keys():
+                    search_word = "{}".format(word)
+                    if search_word in title_list:
+                        counter[word] += 1
+            sorted_counter = dict(
+                sorted(counter.items(),
+                       key=lambda item: item[1], reverse=True))
+            for key, value in sorted_counter.items():
+                if value > 0:
+                    print("{}: {}".format(key, value))
 
-            for key, val in sorted(nary.items(), key=lambda x: (-x[1], x[0])):
-                if val:
-                    print('{}: {}'.format(key, val))
+    else:
+        return
+
+
+if __name__ == '__main__':
+    count_words("hello", ['REDDIT', 'german', 'HI', 'whynot'])
+    count_words('unpopular', ['down', 'vote', 'downvote',
+                              'you', 'her', 'unpopular', 'politics'])
